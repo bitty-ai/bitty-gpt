@@ -21,8 +21,9 @@ class Linear(nn.Module):
         self.weight = torch.nn.Parameter(data = weight_init_for_linear_layer)
 
     def forward(self,x:torch.Tensor)-> torch.Tensor:
-
+        x = x.to(dtype = self.weight.dtype)
         assert x.shape[-1] == self.in_features, 'The shapes of tensors are mismatching'
+
 
         output = torch.matmul(x , self.weight.transpose(-1,-2)) # (T x d_in) x ( d_in x d_out) 
 
@@ -76,7 +77,7 @@ class RMSNorm(nn.Module):
 
         in_dtype = x.dtype
 
-        x = x.to(torch.float32) # need to set this to float 32 for numeric stability 
+        x = x.to(device = self.weight.device, dtype=torch.float32) # need to set this to float 32 for numeric stability 
 
         square_root = torch.sqrt((torch.mean(x*x, dim =-1) + self.eps)) # reverse square root value
         rms  = 1/square_root 
@@ -84,7 +85,7 @@ class RMSNorm(nn.Module):
 
         result = result*rms.unsqueeze(-1)
         
-        return result.to(in_dtype)
+        return result.to(device = self.weight.device, dtype=in_dtype)
 
 # Feed forward model 
 class FFN(nn.Module):
@@ -180,7 +181,7 @@ def scaled_dot_product_attention(q:torch.Tensor, k:torch.Tensor, v:torch.Tensor,
     or it could also be : B,T,H,D//H
     '''
 
-    assert q.shape() == 3, f'The shape of query tensor should be of length 3 but found {q.shape}'
+    # assert len(q.shape) == 4, f'The shape of query tensor should be of length 3 but found {q.shape}'
     D = q.shape[-1] 
     
     out = torch.matmul(q, k.transpose(-1,-2))
@@ -210,7 +211,7 @@ class Multihead_self_attention(nn.Module):
 
     '''
 
-    def __init__(self, d_model:int, num_heads:int, max_seq_length:int=None, device:str=None, dtype:str=None):
+    def __init__(self, d_model:int, num_heads:int, max_seq_length:int=None, device:str=None, dtype:str=None, **kwargs):
         super().__init__()
         self.d_model = d_model
         self.num_heads = num_heads
@@ -244,31 +245,31 @@ class Multihead_self_attention(nn.Module):
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, d_model: int,num_heads: int,d_ff: int,max_seq_len: int, weights=None, *args , **kwargs):
+    def __init__(self, d_model: int,num_heads: int,d_ff: int,max_seq_len: int, device , dtype, weights=None , *args , **kwargs):
         '''
         Single Transformer Block
         d_model : dimension of the model 
         num_heads : no. of heads to divide into
         d_ff : dimension of feed forward network 
         max-seq-length : Max sequence length to maintain for this 
-        
-
+        weights : If you want to test a model          
         '''
         
         super().__init__()
         self.d_model = d_model
         self.max_seq_len = max_seq_len
         self.num_heads = num_heads
+        self.device = device
 
         # device = kwargs.get('device', 'cpu')
         # dtype = kwargs.get('dtype', None)
 
-        self.attn = Multihead_self_attention(d_model = d_model ,num_heads=num_heads, max_seq_length= max_seq_len, **kwargs)
+        self.attn = Multihead_self_attention(d_model = d_model ,num_heads=num_heads, max_seq_length= max_seq_len)
 
-        self.ffn = FFN(d_model, d_ff, **kwargs)
+        self.ffn = FFN(d_model, d_ff)
 
-        self.ln1 = RMSNorm(d_model, **kwargs)
-        self.ln2 = RMSNorm(d_model, **kwargs)
+        self.ln1 = RMSNorm(d_model)
+        self.ln2 = RMSNorm(d_model)
 
     def forward(self, in_features:torch.Tensor):
         # In_features are Batch , context length , D-model 
@@ -277,12 +278,12 @@ class TransformerBlock(nn.Module):
         x = in_features # input features
         x = self.ln1(x)
         x = self.attn(x)
-        x =  in_features + x # dot wise addition  
+        x =  in_features.to(device=self.device) + x.to(device=self.device) # dot wise addition  
         x_partial = x
         x = self.ln2(x)
         x = self.ffn(x)
 
-        return x_partial + x
+        return x_partial.to(device = self.device) + x.to(device =self.device)
 
 
 class TransformerLM(nn.Module):
@@ -315,7 +316,6 @@ class TransformerLM(nn.Module):
         self.lm_head = Linear(in_features = d_model, out_features = vocab_size, **factory_args)
         
     def forward(self, x:torch.Tensor):
-        print('position embedding values are : ',self.token_embeddings.weight.mean(),self.token_embeddings.weight.max())
         x = self.token_embeddings(x)
         
         for module in self.layers:

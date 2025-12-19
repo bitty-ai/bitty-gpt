@@ -33,3 +33,20 @@ def softmax(x:torch.Tensor, dim:int =-1):
 
     return exp_norm_x / each_row_summed
 
+
+
+def log_softmax(x:torch.Tensor, dim = -1):
+    max_values = torch.argmax(x, dim = dim) # N size 
+    
+    maximum_in_each_row = x.gather(dim,index = max_values.unsqueeze(dim))
+    
+    # assert maximum_in_each_row.shape == max_values.shape, f'shape mismatch : {maximum_in_each_row.shape} and {max_values.shape} '
+
+    normalised_x = x-maximum_in_each_row # broadcast operation ( this operation is done to avoid getting numerical stability issues )
+
+    exp_norm_x = torch.exp(normalised_x)
+
+    each_row_summed = torch.sum(exp_norm_x, dim =dim).unsqueeze(dim) # N x 1 
+
+    return normalised_x - torch.log(each_row_summed)
+

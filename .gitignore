@@ -1,2 +1,7 @@
 *TinyStories*
 .venv/
+*.env
+*.pyc
+wandb/
+*.pt
+*.bin
