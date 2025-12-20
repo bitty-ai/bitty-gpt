@@ -1,0 +1,17 @@
+# Starting with Bitty GPT repo
+
+Install dataset by running this command from terminal :
+
+`sh data-download.sh`   
+
+Then run the training file that is located at `src/train.py`
+
+The following flags can be passed for enhancing the training pipeline and to make this customizable that are : 
+
+`wandb` : To enable/ disable wandb logging metrics. Possible values are 0/1   
+
+`train-dataset` : This is to whether you need to convert this dataset to .bin format or not this is a computationally expensive process and can take up to few minutes depending on the dataset size
+
+`train-vocab` : This is to tell whether we you need to train your vocabulary on this dataset or not (currently support only `<|endoftext|>` as a special token) feel free to add yours and this need to be edited in `bitty-tokenizer` that is an independent min-bpe that is easy to change and modify. 
+
+

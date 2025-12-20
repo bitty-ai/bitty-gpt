@@ -25,8 +25,8 @@ from src.inference import Inference
 
 from bitty import Tokenizer
 
-# dtype = torch.bfloat16
-dtype = torch.float32
+dtype = torch.bfloat16
+# dtype = torch.float32
 device = 'cpu'
 if torch.cuda.is_available():
     device ='cuda'
@@ -97,15 +97,19 @@ if __name__ == '__main__':
     parser.add_argument("--wandb", type=int, required=False, default = 0)
     parser.add_argument("--train-dataset", type=str , required = False, default = None)
     parser.add_argument("--train-vocab", type=int , required = False, help = 'If this is set to false then the we will load the vocab from the relevant folder', default = 0)
-    
+    parser.add_argument("--dataset-name", type=str, required=False, choices=["training", "testing", "overfit"], default="training", help="Possible categories are: training, testing, overfit")
+
     args = parser.parse_args()
 
     use_wandb = args.wandb
     train_dataset = args.train_dataset
     train_vocab = args.train_vocab
+    dataset_name =args.dataset_name
 
-    if train_dataset is not None:
-        dataset_path , tokenizer_input_path , save_path = _get_dataset(train_dataset)
+    if dataset_name:
+        dataset_path , tokenizer_input_path , save_path = _get_dataset(dataset_name)
+    else:
+        raise ValueError('Need to add Dataset name to this !')
 
     if use_wandb:
         wandb.login(key=os.environ['WANDB_API_KEY'])
@@ -125,7 +129,8 @@ if __name__ == '__main__':
 
     processing = Processing(tokenizer , input_path = dataset_path, output_path= save_path, special_tokens=special_tokens)
     
-    if train_dataset is not None: # converts input dataset to .bin to train a model 
+    if train_dataset: # converts input dataset to .bin to train a model 
+        print('STARTING TO CONVERT DATA TO BINARY FORMATED BASED ON THE TRAINED VOCABULARY')
         processing.data_to_bin(dtype = dtype_for_bin)
 
     print('Data converted to tokens')

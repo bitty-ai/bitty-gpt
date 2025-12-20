@@ -3,7 +3,8 @@ import os
 import torch 
 import torch.nn as nn 
 from typing import Union, Generator
-import numpy as np 
+import multiprocessing as mp
+import numpy as np
 
 class Processing:
     def __init__(self, tokenizer, input_path , output_path, special_tokens:list[bytes]):
@@ -60,22 +61,32 @@ class Processing:
         # processing file parallel , use the tokenizer
         open(self.output_path, 'wb').close()
 
-        for data in self.read_data_to_bytes():
-            # str_data = data.decode('utf-8', errors='ignore') # TODO: although this we should not ignore 
-            
-            str_data = data 
-            
-            encoded_tokens = self.tokenizer.encoder(str_data) # encoder should always contains special tokens  
-            
-            # print('relevant text to encode is : ', str_data)
-            # print('encoded_tokens are: ', encoded_tokens)
-            # print('decoded data is : ', self.tokenizer.decoder(encoded_tokens))
 
-            encoded_tokens_numpy = np.array(encoded_tokens).astype(dtype).tobytes() # this serialises using which encoding format ? 
-            # add this to a .bin file  
-            self.append_data_to_binary(encoded_tokens_numpy)
+        # ... inside your class method ...
 
-        self._check_bin_file(dtype= dtype) # check back this 
+        with mp.Pool(processes=min(5,mp.cpu_count())) as pool:
+            # pool.imap takes the function and the generator.
+            # It passes each item yielded by the generator to the encoder function.
+            # 'chunksize' can be set to 1 if your data chunks are large.
+            for encoded_tokens in pool.imap(self.tokenizer.encoder, self.read_data_to_bytes()): # iterator map, this iteartes over the generator itself  
+                
+                # 'encoded_tokens' is now the result for one FULL chunk of data
+                encoded_tokens_numpy = np.array(encoded_tokens, dtype=dtype)
+                
+                # Serialize to raw bytes
+                binary_data = encoded_tokens_numpy.tobytes()
+                
+                # Write to your .bin file
+                self.append_data_to_binary(binary_data)
+                    # str_data = data 
+            
+            # encoded_tokens = self.tokenizer.encoder(str_data) # encoder should always contains special tokens  
+
+            # encoded_tokens_numpy = np.array(encoded_tokens).astype(dtype).tobytes() # this serialises using which encoding format ? 
+            # # add this to a .bin file  
+            # self.append_data_to_binary(encoded_tokens_numpy)
+
+        # self._check_bin_file(dtype= dtype) # check back this 
 
     def _check_bin_file(self, dtype):
         '''
