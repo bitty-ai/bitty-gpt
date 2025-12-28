@@ -95,7 +95,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--wandb", type=int, required=False, default = 0)
-    parser.add_argument("--train-dataset", type=str , required = False, default = None)
+    parser.add_argument("--train-dataset", type=str , required = False, default = False)
     parser.add_argument("--train-vocab", type=int , required = False, help = 'If this is set to false then the we will load the vocab from the relevant folder', default = 0)
     parser.add_argument("--dataset-name", type=str, required=False, choices=["training", "testing", "overfit"], default="training", help="Possible categories are: training, testing, overfit")
 
@@ -194,7 +194,7 @@ if __name__ == '__main__':
                         "custom_metric": loss.item() * 1.5 # You can log any math you want
                     })
 
-                if idx % 10 == 0:
+                if idx % 20 == 0:
                     print(f'Inferencing and Saving for step: {idx} in Epoch : {epoch}')
                     inference_obj = Inference(model = model , tokenizer = tokenizer)
                     inference_obj.save()

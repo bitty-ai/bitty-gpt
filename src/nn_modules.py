@@ -29,7 +29,7 @@ class Linear(nn.Module):
 
         if self.device:
             output = output.to(self.device)        
-        return output.contiguous() # This is an important flag to keep 
+        return output.contiguous() #memory should not be fragmented
 
 # Embedding layers
 class Embedding(nn.Module):
@@ -65,8 +65,7 @@ class RMSNorm(nn.Module):
 
         self.d_model = d_model
         self.eps = eps
-        self.weight = torch.nn.Parameter(data=torch.ones(size = (d_model,), **factory_kwargs)) # this way all the input tokens across all batches will have the same layer gain values ( see feature dim5 got upscaled maybe you should also upscale it , that is rule transfer, different from batchnorm) 
-        # this should / will be updated in the backprop of the model !! 
+        self.weight = torch.nn.Parameter(data=torch.ones(size = (d_model,), **factory_kwargs)) # this way all the input tokens across all batches will have the same layer gain values ( see feature dim5 got upscaled maybe you should also upscale it , that is rule transfer, different from batchnorm)
 
     def forward(self, x:torch.Tensor)->torch.Tensor:
         '''
@@ -211,9 +210,7 @@ class Multihead_self_attention(nn.Module):
     
     * d_model : dimensions of the model 
     * num_heads are the total no. of heads to divide to and its belived that each head learn nuanced features that make up a sentence like punctuation ,structure, grammar etc  
-    * max-seq-length : this defines the maximum input sequence length, (but what should be its capped value ?) # TODO    
-
-
+    * max-seq-length : this defines the maximum input sequence length, (but what should be its capped value ?) # TODO
     '''
 
     def __init__(self, d_model:int, num_heads:int, max_seq_length:int=None, device:str=None, dtype:str=None, **kwargs):

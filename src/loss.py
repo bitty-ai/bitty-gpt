@@ -1,50 +1,9 @@
 # Adding all loss functions 
 
-import torch 
-import torch.nn as nn 
-from typing import Optional,Union
-from activations import softmax, log_softmax
-
-
-# # TODO: fix this 
-# def cross_entropy(logits:torch.Tensor , targets:torch.Tensor, ignore_idx:Optional[Union[list[int], int]]=None):
-#     '''
-#     logits: expected shape to be in (N x T x vocab-size)
-#     targets: expected shape to be in (N x T x vocab-size) (one hot encoded)
-#     ignore_idx : indexes to ignore in loss calculations 
-
-#     so its -PlogQ()
-
-#     Input : 1,2,3,0,0,0
-#     Output: 2,3,0,0,0,0
-
-#     '''
-#     log_probs = log_softmax(logits, dim=-1)
-#     assert logits.shape == log_probs.shape, f"Output shape and logits shape are mismatching, expected to be same found {logits.shape} and {log_probs.shape}"
-
-#     loss_per_token = -(targets * log_probs).sum(dim=-1)
-    
-#     # 3. Create the Mask
-#     # Since targets are one-hot, we find the index of the 'true' class 
-#     # using argmax to compare against ignore_idx.
-#     target_classes = targets.argmax(dim=-1)
-    
-#     # Create a mask: 1.0 if we keep it, 0.0 if we ignore it
-#     mask = torch.tensor(data = float(target_classes != ignore_idx))
-    
-#     print('Mask is : ',mask)
-#     # 4. Apply Mask
-#     masked_loss = loss_per_token * mask
-    
-#     # 5. Reduction (Mean over VALID tokens only)
-#     # We divide by the sum of the mask (number of valid tokens)
-#     # Added a small epsilon (1e-8) to prevent division by zero if everything is ignored
-#     return masked_loss.sum() / (mask.sum() + 1e-8)
-
-
 import torch
 import torch.nn.functional as F
-from typing import Optional, Union
+from activations import softmax, log_softmax
+from typing import Optional
 
 def cross_entropy(logits: torch.Tensor, targets: torch.Tensor, ignore_idx: Optional[int] = None):
     '''
