@@ -1,3 +1,6 @@
+The full code is available at : `https://github.com/bitty-ai/bitty-gpt` 
+
+
 # Training a Language model from scratch 
 
 So in the last blog we learned how to build a tokenizer from scratch the sole thing that powers how LLM are learning and we also saw the caveats to not fall into while building one from scratch and ended with our own small tokenizer library from scratch called it `bitty-tokenizer`. So today as more complete version we will be building `bitty-gpt`, a custom gpt implmentation build on top of core pytorch and understanding what all caveats to look before. In this article you will learn about how to build a Optimizer function, activation function, loss function, neural nets, layers all from scratch. Read this twice and fork and play with the github link only then you will really understand this
@@ -87,11 +90,11 @@ Rest of code is self explanatory and intuition has been explained above
 [code photo]
 
 ## Transformer Block
-The concatenation of the Attention block and MLP makes up a transformer block  
+The concatenation of the Attention block and MLP makes up a transformer block as shown in the original attention paper.
 
 
 ## Transformer LM 
-Adding multiple layers and adding these all together we get transformer LM
+Adding multiple layers and adding these all together we get transformer LM 
 
 
 ## Non Linearity / Activation functions 
@@ -102,21 +105,28 @@ There are used to give non-linearity to a model else its just a linear transform
 
 
 ## Loss functions
-Here we are using Cross Entropy loss and this stems back from information theory and in DL we now use variants of this only like getting entropy , KL divergence etc , these are easy to understand to dial up     
+Here we are using Cross Entropy loss and this stems back from information theory and in Deep learning this along with its variants is used like getting entropy , KL divergence etc , these are easy to understand and can be dialed up using hyperparameter as in chain rule we can amplify the first term using hyperparameter. 
+`d_loss / d_theta  = (d_loss / d_actual) * (d_actual / d_theta)`
 
 
 ## Optimizer function 
-We used AdamW and 
+Weight decay : increasing this decay hyperparameter we can prevent overfitting as more the value of this hyperparameter more the model sees this as a completely new parameter, so this is used to make model go from overfitting to generalization (as seen in grokking also)
+We used AdamW with weight decay 
+<paste image code from pdf and from notebook>
 
-## Training  
+## Training
+We have our trained tokenizer, we have english dataset, so the first step involves tokenizing our dataset and storing that in bin so that we can pass that to our model to train on that and for that we will have to use a clever trick of memory mapping (memmap) where CPU thinks that whole dataset is loaded in RAM where in actuality only a partial of that is loaded in the RAM. 
+The same process can be found in `processing.py` 
 
+Once we have .bin file ready for our dataset we have to start training it on the dataset that we have created and we need to make sure the datatypes should be passed in as what our hardware supports and make sure all the computation is done in accelerated device
+
+Train a model using these : `python src/train.py --wandb 0 --train-dataset False --train-vocab 0 --dataset-name overfit`
 
 ## Inference 
-
+Inference is quite simple we just need to load our model and check with some sample generations of how its working / outputting results
 
 ## Saving and loading 
-
-
+Torch makes this much simpler to do its `torch.save()` to save our models weight and `torch.load()` to load these weights   
 
 ## Caveats to consider before 
 
@@ -126,7 +136,7 @@ We used AdamW and
 
 * Handling special tokens in encoder (bitty tokenizer covers this for you :)  
 
-* Using a custom optimizer function :
+* Using a custom optimizer function : using weight decay can be crucial and a smaller value should be preferred else model will see each iteration loop as a new beginning for model training
 
 ## End Note
 Thank you for reading til the end if you have made so far that definitely means you want to a real Machine learning Engineer and not just make API calls to remote servers and I am pretty sure you will love bitty-ai for same 

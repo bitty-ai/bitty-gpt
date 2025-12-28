@@ -33,7 +33,7 @@ if torch.cuda.is_available():
 elif torch.mps.is_available():
     device = 'mps'
 
-print("Using device : ", device)
+print(f"Using device : {device} and Using datatype as : {dtype}\n\n")
 
 # needs to be type annotated to be defined as instance attributes  
 @dataclass
@@ -164,13 +164,9 @@ if __name__ == '__main__':
     try:
         # training loop
         step = 0
-        for epoch in range(epochs):
+        for epoch in range(1,epochs):
             train_dataloader = processing.dataloader(batch_size = batch_size, context_length = GPT_2_XL.context_length, padding_token = '<|endoftext|>', device = device)
 
-            inference_obj = Inference(model = model , tokenizer = tokenizer)
-            inference_obj.save()
-            output_generated = inference_obj.generate_sample(stop_token=0, device = device)
-            
             print(f'Epoch iteration is : {epoch}')
             for idx, data in enumerate(train_dataloader):
                 # labels = torch.tensor(labels, dtype = torch.long).contiguous()
@@ -197,6 +193,13 @@ if __name__ == '__main__':
                         "epoch": epoch,
                         "custom_metric": loss.item() * 1.5 # You can log any math you want
                     })
+
+                if idx % 10 == 0:
+                    print(f'Inferencing and Saving for step: {idx} in Epoch : {epoch}')
+                    inference_obj = Inference(model = model , tokenizer = tokenizer)
+                    inference_obj.save()
+                    output_generated = inference_obj.generate_sample(stop_token=0, device = device)
+                    
 
             # output_generated = Inference(model = model , tokenizer = tokenizer).save().generate_sample(stop_token=0)
             # print(output_generated)

@@ -66,9 +66,9 @@ class Processing:
 
         with mp.Pool(processes=min(5,mp.cpu_count())) as pool:
             # pool.imap takes the function and the generator.
-            # It passes each item yielded by the generator to the encoder function.
+            # It passes each item yielded by the generator to the encoder function and it maintains the order also 
             # 'chunksize' can be set to 1 if your data chunks are large.
-            for encoded_tokens in pool.imap(self.tokenizer.encoder, self.read_data_to_bytes()): # iterator map, this iteartes over the generator itself  
+            for encoded_tokens in pool.imap(self.tokenizer.encoder, self.read_data_to_bytes()): # iterator map, this iterates over the generator itself  
                 
                 # 'encoded_tokens' is now the result for one FULL chunk of data
                 encoded_tokens_numpy = np.array(encoded_tokens, dtype=dtype)
@@ -78,7 +78,6 @@ class Processing:
                 
                 # Write to your .bin file
                 self.append_data_to_binary(binary_data)
-                    # str_data = data 
             
             # encoded_tokens = self.tokenizer.encoder(str_data) # encoder should always contains special tokens  
 

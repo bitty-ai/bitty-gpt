@@ -61,10 +61,10 @@ class RMSNorm(nn.Module):
     '''
     def __init__(self, d_model:int, eps:float =1e-5, device = None , dtype=None) -> None:
         super().__init__()
+        factory_kwargs = {'device':device, 'dtype':dtype} 
 
         self.d_model = d_model
         self.eps = eps
-        factory_kwargs = {'device':device, 'dtype':dtype} 
         self.weight = torch.nn.Parameter(data=torch.ones(size = (d_model,), **factory_kwargs)) # this way all the input tokens across all batches will have the same layer gain values ( see feature dim5 got upscaled maybe you should also upscale it , that is rule transfer, different from batchnorm) 
         # this should / will be updated in the backprop of the model !! 
 
@@ -77,7 +77,8 @@ class RMSNorm(nn.Module):
 
         in_dtype = x.dtype
 
-        x = x.to(device = self.weight.device, dtype=torch.float32) # need to set this to float 32 for numeric stability 
+        # x = x.to(device = self.weight.device, dtype=torch.float32) # need to set this to float 32 for numeric stability 
+        x = x.to(dtype=torch.float32) # need to set this to float 32 for numeric stability 
 
         square_root = torch.sqrt((torch.mean(x*x, dim =-1) + self.eps)) # reverse square root value
         rms  = 1/square_root 
@@ -85,7 +86,8 @@ class RMSNorm(nn.Module):
 
         result = result*rms.unsqueeze(-1)
         
-        return result.to(device = self.weight.device, dtype=in_dtype)
+        # return result.to(device = self.weight.device, dtype=in_dtype)
+        return result.to(dtype=in_dtype)
 
 # Feed forward model 
 class FFN(nn.Module):
@@ -113,19 +115,21 @@ class RotaryPositionalEmbedding(nn.Module):
     '''
     def __init__(self, d_k:int, max_seq_length:int, **kwargs) -> None:
         super().__init__()
+        self.device = kwargs.get('device')
+        self.dtype = kwargs.get('dtype')
+        self.factory_args = {'device':self.device, 'dtype':self.dtype} 
 
         assert d_k%2 ==0 , f'Found the dimension as : {d_k} should be a multiple of 2'
         self.theta = 10_000 # Fixed frequency  
         self.d_k = d_k
         self.max_seq_length= max_seq_length 
 
-    
     def rope_freqs(self):
         half = self.d_k//2
-        power_raised = (-2*torch.arange(start =0, end = half) /self.d_k)
+        power_raised = (-2*torch.arange(start =0, end = half, **self.factory_args) /self.d_k)
         freq = self.theta ** power_raised
 
-        t = torch.arange(self.max_seq_length) # this works only for the t dimension (else will require) 
+        t = torch.arange(self.max_seq_length, **self.factory_args) # this works only for the t dimension (else will require) 
         angles= t[:,None] * freq[None,:]
         return angles.cos(), angles.sin() # precomputed values  
 
@@ -136,8 +140,8 @@ class RotaryPositionalEmbedding(nn.Module):
         x_even = x[..., 0::2]
         x_odd = x[..., 1::2]
 
-        cos = cos.to(x.device)
-        sin = sin.to(x.device)
+        # cos = cos.to(x.device)
+        # sin = sin.to(x.device)
 
         # apply rot
         x_rot_even = x_even * cos - x_odd * sin # 
@@ -146,7 +150,8 @@ class RotaryPositionalEmbedding(nn.Module):
         # interleave back to original shape
         x_out = torch.stack([x_rot_even, x_rot_odd], dim=-1)
         x_out = x_out.flatten(-2)    # fuse last 2 dims
-        return x_out.to(device = x.device, dtype = x.dtype) 
+        # return x_out.to(device = x.device, dtype = x.dtype) 
+        return x_out.to(dtype = x.dtype) 
 
 
     def forward(self, x:torch.Tensor , token_position:torch.Tensor=None):
@@ -220,7 +225,7 @@ class Multihead_self_attention(nn.Module):
         factory_args = {'device':device ,'dtype':dtype}
         assert d_model %  num_heads == 0, f'The heads should be a factor of d-model .Found d_model as {d_model} and heads as {num_heads}' 
         
-        self.positional_embedding = RotaryPositionalEmbedding(max_seq_length=max_seq_length,d_k=d_model//num_heads, device=device , dtype= dtype) # d_k = d_model / multi-si nice to be  
+        self.positional_embedding = RotaryPositionalEmbedding(max_seq_length=max_seq_length,d_k=d_model//num_heads, **factory_args) # d_k = d_model / multi-si nice to be  
 
         self.q_proj = Linear(d_model, d_model, **factory_args)
         self.k_proj = Linear(d_model, d_model, **factory_args)
@@ -256,6 +261,8 @@ class TransformerBlock(nn.Module):
         '''
         
         super().__init__()
+        factory_kwargs = {'device':device, 'dtype':dtype} 
+
         self.d_model = d_model
         self.max_seq_len = max_seq_len
         self.num_heads = num_heads
@@ -264,12 +271,12 @@ class TransformerBlock(nn.Module):
         # device = kwargs.get('device', 'cpu')
         # dtype = kwargs.get('dtype', None)
 
-        self.attn = Multihead_self_attention(d_model = d_model ,num_heads=num_heads, max_seq_length= max_seq_len)
+        self.attn = Multihead_self_attention(d_model = d_model ,num_heads=num_heads, max_seq_length= max_seq_len, **factory_kwargs)
 
-        self.ffn = FFN(d_model, d_ff)
+        self.ffn = FFN(d_model, d_ff, **factory_kwargs)
 
-        self.ln1 = RMSNorm(d_model)
-        self.ln2 = RMSNorm(d_model)
+        self.ln1 = RMSNorm(d_model, **factory_kwargs)
+        self.ln2 = RMSNorm(d_model, **factory_kwargs)
 
     def forward(self, in_features:torch.Tensor):
         # In_features are Batch , context length , D-model 
@@ -316,8 +323,7 @@ class TransformerLM(nn.Module):
         self.lm_head = Linear(in_features = d_model, out_features = vocab_size, **factory_args)
         
     def forward(self, x:torch.Tensor):
-        x = self.token_embeddings(x)
-        
+        x = self.token_embeddings(x)        
         for module in self.layers:
             x = module(x)
         x = self.ln_final(x)

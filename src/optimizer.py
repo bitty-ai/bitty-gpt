@@ -115,19 +115,17 @@ class AdamW(Optimizer):
                 if p.grad is None:
                     continue
 
-                state = self.state[p] #state object is present there
+                state = self.state[p] #state dict is present there
 
                 t = state.get('t', 1)
                 if self.lr_scheduler:
                     lr = self.lr_scheduler(t)
-                    # print('learning_rate is :', lr)
 
-                grad = p.grad.data # p is a tensor that have these values pre-defined 
+                grad = p.grad.data # p is a tensor that has initialised values for iteration1 
 
                 # print('grad value is : ', grad)
                 # p.data -= lr * decay_rate * p.data
                 # p.data.mul_(1 - lr * decay_rate)
-
 
                 moment1 = state.get('moment1', torch.zeros_like(p.grad.data))
                 moment2 = state.get('moment2', torch.zeros_like(p.grad.data)) # initialise with zeros
