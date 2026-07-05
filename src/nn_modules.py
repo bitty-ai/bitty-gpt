@@ -89,8 +89,20 @@ class RMSNorm(nn.Module):
         return result.to(dtype=in_dtype)
 
 # Feed forward model 
-class FFN(nn.Module):
+class FFN_MOE(nn.Module):
     def __init__(self, d_model:int, d_ff:int=None, **kwargs):
+        ''' 
+        This is where we do MOEfication of models instead of a big chunk we divide that to smaller modules and add a router over top to learn where to go 
+        The linear layers in the MLP they acts as Knowledge holders and we can divide that up in smaller modules to get the desired output 
+
+        In MOE we have 3 optionst to choose from : 
+        1. Tokens choose experts
+        2. Expert chooses token
+        3. global routing via optimization 
+
+        now people have converged to this one approach of doing tokens choosing experts 
+
+        '''
         super().__init__()
         if not d_ff:
             NEAREST_MULTIPLE = 64
@@ -104,6 +116,43 @@ class FFN(nn.Module):
     def forward(self, x:torch.Tensor):
         return self.w2(SiLU(self.w1(x)) * self.w3(x))
 
+
+class FFN(nn.Module):
+    def __init__(self, d_model:int , d_ff:int=None, **kwargs) -> None:
+        super().__init__()
+        self.d_model = d_model
+        self.d_ff = d_ff
+        self.top_k = 2
+        self.no_of_experts = 8
+        assert d_ff % self.top_k == 0, f'The d_ff should be a multiple of the top_k . Found d_ff as {d_ff} and top_k as {self.top_k}'
+        self.expert_output_dim = d_ff // self.top_k
+        self.expert_layer = Linear(in_features=d_model, out_features=self.no_of_experts)
+        self.experts = [FFN_MOE(d_model = self.d_model, d_ff = self.expert_output_dim) for _ in range(self.no_of_experts)]
+
+    def forward(self, x:torch.Tensor):
+        B, T, _ = x.shape
+        router_weights, router_indices = self._choosing_router(x)  # (B, T, top_k), (B, T, top_k)
+
+        x_expand = x.unsqueeze(-2).expand(-1, -1, self.top_k, -1)  # (B, T, top_k, d_model)
+        expert_inputs = x_expand.reshape(-1, self.d_model)  # (B*T*top_k, d_model)
+        chosen_experts = router_indices.reshape(-1)  # (B*T*top_k,)
+        expert_outputs = torch.zeros(size = (expert_inputs.shape[0], self.expert_output_dim) , device=x.device, dtype=x.dtype)  # (B*T*top_k, d_model)
+
+        for expert_idx in range(self.no_of_experts):
+            mask = (chosen_experts == expert_idx)
+            if mask.any():
+                expert_outputs[mask] = self.experts[expert_idx](expert_inputs[mask])
+
+        expert_outputs = expert_outputs.view(B, T, self.top_k, self.d_model)  # (B, T, top_k, d_model)
+        weighted = expert_outputs * router_weights.unsqueeze(-1)  # (B, T, top_k, d_model)
+        output = weighted.sum(dim=2)  # (B, T, d_model)
+
+        return output
+
+    def _choosing_router(self, x:torch.Tensor):
+        router_probabilities = softmax(self.expert_layer(x))  # (B, T, num_experts)
+        topk = torch.topk(router_probabilities, dim=-1, k=self.top_k)
+        return topk.values, topk.indices  # (B, T, top_k), (B, T, top_k)
 
 # RoPE implementation 
 class RotaryPositionalEmbedding(nn.Module):
